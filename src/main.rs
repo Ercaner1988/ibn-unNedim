@@ -850,6 +850,39 @@ fn headless_requested() -> bool {
         || std::env::var("BGE_HEADLESS").is_ok_and(|v| v == "1")
 }
 
+/// Bu makinede Vulkan bağdaştırıcısı var mı (yazılım/CPU bağdaştırıcısı sayılmaz).
+#[cfg(windows)]
+fn vulkan_var() -> bool {
+    use eframe::egui_wgpu::wgpu;
+    let mut tanim = wgpu::InstanceDescriptor::new_without_display_handle();
+    tanim.backends = wgpu::Backends::VULKAN;
+    let ornek = wgpu::Instance::new(tanim);
+    pollster::block_on(ornek.enumerate_adapters(wgpu::Backends::VULKAN))
+        .iter()
+        .any(|a| a.get_info().device_type != wgpu::DeviceType::Cpu)
+}
+
+/// wgpu ayarı: Windows'ta Vulkan önce, yoksa DX12; ikisi birden ASLA. AMD'nin DX12 gölgelendirici
+/// derleyicisi (amdxc64) açılışta ~140 sn çekirdeğin %50-90'ını yer, özel bellek 390+ MB; Vulkan'da
+/// boşta 0 CPU (ölçüm: Nazar docs/ARAYUZ-PLANI.md §6). İkisi açıksa DX12 de yüklenir (+64 MB).
+fn wgpu_ayari() -> eframe::egui_wgpu::WgpuConfiguration {
+    #[allow(unused_mut)]
+    let mut ayar = eframe::egui_wgpu::WgpuConfiguration {
+        surface: eframe::egui_wgpu::SurfaceConfig::LOW_LATENCY, // vsync
+        ..Default::default()
+    };
+    #[cfg(windows)]
+    if let eframe::egui_wgpu::WgpuSetup::CreateNew(yeni) = &mut ayar.wgpu_setup {
+        use eframe::egui_wgpu::wgpu::Backends;
+        yeni.instance_descriptor.backends = if vulkan_var() {
+            Backends::VULKAN
+        } else {
+            Backends::DX12
+        };
+    }
+    ayar
+}
+
 /// The binary is built for x86-64-v3; without AVX2+FMA candle's CPU ops would
 /// SIGILL. Checked once and shared by both startup paths below.
 fn avx2_fma_available() -> bool {
@@ -923,10 +956,14 @@ fn main() -> Result<()> {
     }
 
     let native_options = eframe::NativeOptions {
-        // DX12 via wgpu, not glow/OpenGL - see the Cargo.toml comment on the
-        // `eframe` dependency (el-fihrist kural 9037960d582ebfe7: glow blanks
-        // to a black window on some Windows 11 + AMD/Intel-iGPU combinations).
+        // wgpu (Vulkan önce, yoksa DX12; bkz. `wgpu_ayari`), not glow/OpenGL
+        // (el-fihrist kural 9037960d582ebfe7: glow blanks to a black window on
+        // some Windows 11 + AMD/Intel-iGPU combinations).
         renderer: eframe::Renderer::Wgpu,
+        wgpu_options: wgpu_ayari(),
+        multisampling: 0,
+        depth_buffer: 0,
+        stencil_buffer: 0,
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title(bge_settings::DISPLAY_NAME)
             .with_icon(std::sync::Arc::new(
@@ -942,6 +979,12 @@ fn main() -> Result<()> {
         bge_settings::APP_ID,
         native_options,
         Box::new(|cc| {
+            // Seçilen arka ucu kanıtla (bge-err.log): modül listesi yetmez, AMD'nin Vulkan
+            // sürücüsü de d3d12/amdxc64 yükler.
+            if let Some(rs) = &cc.wgpu_render_state {
+                let b = rs.adapter.get_info();
+                eprintln!("grafik: {:?} · {} ({:?})", b.backend, b.name, b.device_type);
+            }
             bge_theme::apply(&cc.egui_ctx);
             Ok(Box::new(bge_gui::GuiApp::new(status, &cc.egui_ctx)))
         }),

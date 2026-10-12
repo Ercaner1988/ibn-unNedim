@@ -29,8 +29,9 @@ serde_json = "1"
 ureq = { version = "2", default-features = false, features = ["tls", "json", "gzip"] }
 # default-features off: glow (OpenGL) blanks to a black window on some
 # Windows 11 + AMD/Intel-integrated-GPU combinations (Wgl sRGB swap-chain
-# mismatch with DWM - el-fihrist kural 9037960d582ebfe7). wgpu's DX12 backend
-# is what's actually native to Windows' compositor, so it's used instead.
+# mismatch with DWM - el-fihrist kural 9037960d582ebfe7). wgpu is used instead:
+# Vulkan first, DX12 only if no Vulkan adapter (src/main.rs `wgpu_ayari`; AMD's
+# DX12 shader compiler amdxc64 burns ~140 s of CPU at every start).
 # NOTE: wgpu's DX12 backend previously pulled `windows` 0.62 while another
 # dependency in this graph pinned `windows-core` 0.58 (E0277, "multiple
 # different versions of crate `windows`") - re-check this if bumping eframe
@@ -66,6 +67,8 @@ tokenizers = { version = "0.21", default-features = false, features = ["unstable
 hf-hub = { version = "0.4", features = ["tokio"] }
 tokio = { version = "1", features = ["full"] }
 axum = "0.8"
+# Vulkan yoklaması (wgpu bağdaştırıcı sayımı eşzamansız); ağaçta zaten var, yeni crate eklemez.
+pollster = "1"
 
 [features]
 # Tema menüsüne el-Fihrist kataloğunu ekler; kapalıyken yalnız yerleşik tema var.

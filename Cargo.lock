@@ -2249,6 +2249,7 @@ dependencies = [
  "eframe",
  "half",
  "hf-hub",
+ "pollster",
  "rayon",
  "serde",
  "serde_json",
