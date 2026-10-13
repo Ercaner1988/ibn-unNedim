@@ -81,7 +81,13 @@ foreach ($ad in $Ikililer) {
         } elseif (-not (Test-Path $HizmetBetigi)) {
             Write-Warning "hizmet ($HizmetPortu) durduruldu ama $HizmetBetigi yok: elle başlatın"
         } else {
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $HizmetBetigi
+            # Start-Process ile (ShellExecute, tutamaç mirası yok). `& powershell` ile çağrılınca
+            # start.ps1'in -RedirectStandardOutput'la açtığı ibnun-nedim bu betiğin stdout borusunu
+            # miras alıp açık tutuyordu: çıktısı borulanan kur.ps1 hizmet yaşadıkça hiç bitmiyordu
+            # (2026-10-13; ping'le canlandırıldı: eski 20 sn = çocuğun ömrü, yeni 1 sn).
+            $sp = Start-Process powershell -WindowStyle Hidden -PassThru -ArgumentList `
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$HizmetBetigi`""
+            $sp.WaitForExit()
             # start.ps1 port doluysa sessizce çıkar: başlatıldığını süreçten doğrula.
             $acik = Get-Process -Name 'ibnun-nedim' -ErrorAction SilentlyContinue |
                 Where-Object { $_.Path -eq (Join-Path $Hedef 'ibnun-nedim.exe') }
