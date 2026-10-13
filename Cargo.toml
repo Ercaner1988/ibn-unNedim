@@ -16,7 +16,7 @@ arkaplan-politika = { path = "crates/arkaplan-politika" }
 bge-arkaplan-sekme = { path = "crates/bge-arkaplan-sekme" }
 # Ortak tema (Kilim paleti, Semerkant kâğıdı, kilim çerçeve). git + rev: kardeş
 # depo yolu klonlayan herkeste ve CI'da yok. Tema değişince rev'i güncelle.
-kilim-tema = { git = "https://github.com/Ercaner1988/kilim-tema", rev = "a62bfc71227202fe1173b8f9d36aaa723fd5a12c" }
+kilim-tema = { git = "https://github.com/Ercaner1988/kilim-tema", rev = "463ff671b548fb976610248a6569d8975caa5a66" }
 # Seçimlik tema kataloğu (el-Fihrist): tema yalnız kullanıcı Tema menüsünden değiştirirken
 # sorulur. Aynı kilim-tema rev'ini çeker; ikisi birlikte güncellenir.
 fihrist-tema = { git = "https://github.com/Ercaner1988/el-Fihrist", rev = "3f46861c008f38f1e5e07202d9d1ff0f2ed4f106" }

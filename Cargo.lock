@@ -494,7 +494,7 @@ dependencies = [
  "bge-settings",
  "bge-theme",
  "eframe",
- "kilim-tema",
+ "kilim-tema 0.1.0 (git+https://github.com/Ercaner1988/kilim-tema?rev=463ff671b548fb976610248a6569d8975caa5a66)",
 ]
 
 [[package]]
@@ -534,7 +534,7 @@ dependencies = [
  "bge-theme",
  "eframe",
  "fihrist-tema",
- "kilim-tema",
+ "kilim-tema 0.1.0 (git+https://github.com/Ercaner1988/kilim-tema?rev=463ff671b548fb976610248a6569d8975caa5a66)",
  "windows-sys 0.61.2",
 ]
 
@@ -547,7 +547,7 @@ name = "bge-theme"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "kilim-tema",
+ "kilim-tema 0.1.0 (git+https://github.com/Ercaner1988/kilim-tema?rev=463ff671b548fb976610248a6569d8975caa5a66)",
 ]
 
 [[package]]
@@ -1525,7 +1525,7 @@ name = "fihrist-tema"
 version = "0.1.0"
 source = "git+https://github.com/Ercaner1988/el-Fihrist?rev=3f46861c008f38f1e5e07202d9d1ff0f2ed4f106#3f46861c008f38f1e5e07202d9d1ff0f2ed4f106"
 dependencies = [
- "kilim-tema",
+ "kilim-tema 0.1.0 (git+https://github.com/Ercaner1988/kilim-tema?rev=a62bfc71227202fe1173b8f9d36aaa723fd5a12c)",
 ]
 
 [[package]]
@@ -2556,6 +2556,24 @@ name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
+
+[[package]]
+name = "kilim-palet"
+version = "0.1.0"
+source = "git+https://github.com/Ercaner1988/kilim-tema?rev=463ff671b548fb976610248a6569d8975caa5a66#463ff671b548fb976610248a6569d8975caa5a66"
+dependencies = [
+ "egui",
+]
+
+[[package]]
+name = "kilim-tema"
+version = "0.1.0"
+source = "git+https://github.com/Ercaner1988/kilim-tema?rev=463ff671b548fb976610248a6569d8975caa5a66#463ff671b548fb976610248a6569d8975caa5a66"
+dependencies = [
+ "egui",
+ "image",
+ "kilim-palet",
+]
 
 [[package]]
 name = "kilim-tema"

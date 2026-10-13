@@ -266,6 +266,8 @@ pub fn apply(ctx: &egui::Context) {
     install_fonts(ctx);
     apply_visuals(ctx);
     ctx.set_theme(egui::ThemePreference::System);
+    // Taşmasız yerleşim: her metin kullanılabilir genişlikte sarılır (kilim-tema yerlesim.rs).
+    kilim_tema::sarma_kur(ctx);
 }
 
 /// Re-derives both visuals from the palette; call again after the kilim

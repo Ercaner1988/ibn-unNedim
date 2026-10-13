@@ -266,7 +266,8 @@ impl eframe::App for GuiApp {
         let ctx = ui.ctx().clone();
         // The server thread updates status independently of egui's event loop,
         // so keep repainting on a timer rather than only on user input.
-        ctx.request_repaint_after(Duration::from_millis(250));
+        // CLAUDE.md: zamanlı yeniden çizim en az 500 ms.
+        ctx.request_repaint_after(Duration::from_millis(500));
         let p = theme::current(&ctx);
         let tercih = self.tercih;
 
@@ -386,9 +387,9 @@ fn nav_bar(ui: &mut Ui, p: Palette, screen: &mut Screen) {
                 ui.spacing_mut().item_spacing.x = theme::GAP_XS;
                 let width = (ui.available_width() - 2.0 * theme::GAP_XS) / 3.0;
                 for (label, target) in [
-                    ("Status", Screen::Status),
-                    ("Connections", Screen::Connections),
-                    ("Settings", Screen::Settings),
+                    ("Durum", Screen::Status),
+                    ("Bağlantılar", Screen::Connections),
+                    ("Ayarlar", Screen::Settings),
                 ] {
                     if theme::nav_tab(ui, p, label, *screen == target, width).clicked() {
                         *screen = target;
