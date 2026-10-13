@@ -123,11 +123,11 @@ pub fn ocr_durumu(
 }
 
 /// Bugün gömülen: sayaç gün değişince o anki değerden yeniden sayılır.
-pub fn bugun_farki(baz: &mut (Option<u32>, u64), tarih: Option<u32>, toplam: u64) -> u64 {
-    if baz.0 != tarih {
-        *baz = (tarih, toplam);
+pub fn bugun_farki(taban: &mut (Option<u32>, u64), tarih: Option<u32>, toplam: u64) -> u64 {
+    if taban.0 != tarih {
+        *taban = (tarih, toplam);
     }
-    toplam.saturating_sub(baz.1)
+    toplam.saturating_sub(taban.1)
 }
 
 #[cfg(test)]
@@ -217,10 +217,10 @@ mod tests {
 
     #[test]
     fn bugun_gece_yarisi_sifirlanir() {
-        let mut baz = (Some(20261013), 0);
-        assert_eq!(bugun_farki(&mut baz, Some(20261013), 40), 40);
-        assert_eq!(bugun_farki(&mut baz, Some(20261014), 55), 0, "yeni gün");
-        assert_eq!(bugun_farki(&mut baz, Some(20261014), 60), 5);
+        let mut taban = (Some(20261013), 0);
+        assert_eq!(bugun_farki(&mut taban, Some(20261013), 40), 40);
+        assert_eq!(bugun_farki(&mut taban, Some(20261014), 55), 0, "yeni gün");
+        assert_eq!(bugun_farki(&mut taban, Some(20261014), 60), 5);
     }
 
     #[test]
