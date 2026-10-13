@@ -15,6 +15,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
 
 mod is;
+pub mod politika;
 pub use is::{Evre, Is, IsBekcisi};
 
 /// Exe adında geçen parça → görünen ad (ilk eşleşen kazanır).

@@ -884,6 +884,7 @@ fn local_tools_card(ui: &mut Ui, p: Palette) {
 fn stage_label(evre: bge_clients::Evre) -> (&'static str, f32) {
     match evre {
         bge_clients::Evre::ModelBekliyor => ("waiting for the model to load", 40.0),
+        bge_clients::Evre::PolitikaBekliyor => ("held by background policy", f32::INFINITY),
         bge_clients::Evre::SiraBekliyor => ("waiting in the batch queue", 60.0),
         bge_clients::Evre::HizliHesap => ("search query", 3.0),
         bge_clients::Evre::TopluHesap => ("batch job", 120.0),

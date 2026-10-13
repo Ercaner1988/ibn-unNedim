@@ -10,6 +10,8 @@ use std::time::Instant;
 pub enum Evre {
     /// Model bellekte değil; yüklenmesi bekleniyor.
     ModelBekliyor,
+    /// Toplu iş, arka plan politikası izin versin diye bekliyor (duraklatma, saat, bellek, CPU, kullanıcı).
+    PolitikaBekliyor,
     /// Toplu iş, sırası gelsin diye toplu kapıda bekliyor.
     SiraBekliyor,
     /// Arama sorgusu hızlı şeritte hesaplanıyor.
@@ -20,7 +22,10 @@ pub enum Evre {
 
 impl Evre {
     pub fn bekliyor_mu(self) -> bool {
-        matches!(self, Evre::ModelBekliyor | Evre::SiraBekliyor)
+        matches!(
+            self,
+            Evre::ModelBekliyor | Evre::PolitikaBekliyor | Evre::SiraBekliyor
+        )
     }
 }
 

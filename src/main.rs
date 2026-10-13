@@ -644,6 +644,11 @@ async fn gom(
     // N*parallel is parcacigi aciyordu ve kisa sorgu CPU'dan 1/(N*parallel+1) pay aliyordu
     // (2026-09-25 olculdu: ayni sorgu yuk altinda 7,4 / 47 / 2,8 sn, bosken ~0,65 sn).
     let hizli = kisa_mi(&inputs);
+    if !hizli {
+        // Arka plan politikası (Arka plan sekmesi); dosya yoksa hemen geçer.
+        let _evre = bekci.evre(Evre::PolitikaBekliyor, text_count);
+        let _ = tokio::task::spawn_blocking(bge_clients::politika::bekle).await;
+    }
     let izin = if hizli {
         None
     } else {
