@@ -318,19 +318,7 @@ impl Sekme {
             if her_zaman {
                 return;
             }
-            let boyut = egui::vec2(SAAT_KUTUSU, theme::INPUT_HEIGHT);
-            let r1 = kilim_tema::birim(ui, SAAT_KUTUSU, |ui| {
-                theme::text_input(ui, p, &mut self.saat[i].0, boyut)
-            });
-            ui.label(theme::rich(
-                "–",
-                theme::SIZE_CAPTION,
-                Weight::Regular,
-                p.text,
-            ));
-            let r2 = kilim_tema::birim(ui, SAAT_KUTUSU, |ui| {
-                theme::text_input(ui, p, &mut self.saat[i].1, boyut)
-            });
+            let (r1, r2) = saat_araligi(ui, p, &mut self.saat[i]);
             if r1.lost_focus() || r2.lost_focus() {
                 match SaatAraligi::ayristir(&format!("{}-{}", self.saat[i].0, self.saat[i].1)) {
                     Ok(a) => {
@@ -443,5 +431,63 @@ impl Sekme {
                 q.sinirlar.kullanirken_dur = kullanirken;
             });
         }
+    }
+}
+
+/// Saat aralığı kutuları (başlangıç – bitiş): sarmalı satırda TEK birim; ayrı birimler "00:00 –" üstte,
+/// bitiş altta kalacak biçimde bölünüyordu.
+fn saat_araligi(
+    ui: &mut Ui,
+    p: Palette,
+    saat: &mut (String, String),
+) -> (egui::Response, egui::Response) {
+    let boyut = egui::vec2(SAAT_KUTUSU, theme::INPUT_HEIGHT);
+    // İki kutu + tire + iki aralık.
+    kilim_tema::birim(ui, 2.0 * SAAT_KUTUSU + 24.0, |ui| {
+        ui.horizontal(|ui| {
+            let r1 = theme::text_input(ui, p, &mut saat.0, boyut);
+            ui.label(theme::rich(
+                "–",
+                theme::SIZE_CAPTION,
+                Weight::Regular,
+                p.text,
+            ));
+            (r1, theme::text_input(ui, p, &mut saat.1, boyut))
+        })
+        .inner
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saat_araligi_tek_parca_sarilir() {
+        // OCR satırı: anahtar + "her zaman" + aralık. Dar satırda "00:00 –" üstte, "06:30" altta
+        // kalıyordu; aralık bütün olarak alt satıra inmeli.
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let mut saat = ("00:00".to_string(), "06:30".to_string());
+        let mut ust = (0.0, 1.0);
+        for _ in 0..3 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(260.0, 300.0),
+                )),
+                ..Default::default()
+            };
+            let mut out = ctx.run_ui(input, |ui| {
+                let p = theme::current(ui.ctx());
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("anahtar ve her zaman metni");
+                    let (a, b) = saat_araligi(ui, p, &mut saat);
+                    ust = (a.rect.top(), b.rect.top());
+                });
+            });
+            out.textures_delta.clear(); // çizici yok
+        }
+        assert_eq!(ust.0, ust.1, "aralık bölündü");
     }
 }
