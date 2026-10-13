@@ -365,7 +365,7 @@ pub fn danger_button(ui: &mut Ui, p: Palette, label: &str, enabled: bool) -> Res
 
 /// Status pill: surface bg, 1 px border, full radius, padding 8x4, 8 px dot +
 /// caption/500 label.
-pub fn status_pill(ui: &mut Ui, p: Palette, dot_color: Color32, label: &str) {
+pub fn status_pill(ui: &mut Ui, p: Palette, dot_color: Color32, label: &str) -> Response {
     egui::Frame::new()
         .fill(p.bg_surface)
         .stroke(Stroke::new(BORDER_WIDTH, p.border))
@@ -375,9 +375,12 @@ pub fn status_pill(ui: &mut Ui, p: Palette, dot_color: Color32, label: &str) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = GAP_SM;
                 status_bead(ui, p, dot_color, 12.0);
-                ui.label(rich(label, SIZE_CAPTION, Weight::Medium, p.text));
-            });
-        });
+                // Never wraps: under sarma_kur a right_to_left header squeezed it into "Rea/dy".
+                ui.add(egui::Label::new(rich(label, SIZE_CAPTION, Weight::Medium, p.text)).extend())
+            })
+            .inner
+        })
+        .inner
 }
 
 /// One of the three bottom nav tabs. Active = paper tinted with the accent

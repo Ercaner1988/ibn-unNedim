@@ -286,7 +286,7 @@ impl eframe::App for GuiApp {
                 .show(ui, |ui| {
                     let phase = self.status.phase.lock().unwrap().clone();
 
-                    header_row(ui, p, phase.as_ref(), &mut self.tercih);
+                    let _ = header_row(ui, p, phase.as_ref(), &mut self.tercih);
                     ui.add_space(theme::GAP_LG);
                     // Tabs sit under the header (Penpot "v2 / *" boards), so they
                     // can never be pushed off-screen by tall content.
@@ -339,7 +339,7 @@ fn header_row(
     p: Palette,
     phase: Option<&Phase>,
     tercih: &mut kilim_tema::TemaTercihi,
-) {
+) -> egui::Response {
     ui.horizontal(|ui| {
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing.y = theme::GAP_XS;
@@ -363,9 +363,11 @@ fn header_row(
             }
             ui.add_space(theme::GAP_SM);
             let (color, label) = phase_pill(phase, &p);
-            theme::status_pill(ui, p, color, label);
-        });
-    });
+            theme::status_pill(ui, p, color, label)
+        })
+        .inner
+    })
+    .inner
 }
 
 /// Phase -> (dot colour, pill label), per DESIGN.md's "Shared parts" table.
@@ -1173,6 +1175,38 @@ fn settings_screen(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn status_pill_stays_on_one_line_at_minimum_width() {
+        // Same frame as GuiApp::ui at the 480-pt minimum window: with sarma_kur the pill
+        // label used to wrap as "Rea/dy".
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let mut tercih = kilim_tema::TemaTercihi::varsayilan(kilim_tema::Varyant::CamGobegiAltin);
+        let phase = Phase::Ready { url: "u".into() };
+        let mut h = f32::MAX;
+        for _ in 0..3 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(480.0, 560.0),
+                )),
+                ..Default::default()
+            };
+            let mut out = ctx.run_ui(input, |ui| {
+                let p = theme::current(ui.ctx());
+                kilim_tema::cerceve(ui, &tercih.clone(), |ui| {
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::new().inner_margin(theme::INSET_LG as i8))
+                        .show(ui, |ui| {
+                            h = header_row(ui, p, Some(&phase), &mut tercih).rect.height()
+                        });
+                });
+            });
+            out.textures_delta.clear(); // no renderer here
+        }
+        assert!(h < 2.0 * theme::SIZE_CAPTION, "pill wrapped: {h} pt tall");
+    }
 
     #[test]
     fn phase_pill_maps_every_phase() {
