@@ -12,6 +12,7 @@ bge-connectors = { path = "crates/bge-connectors" }
 bge-theme = { path = "crates/bge-theme" }
 bge-gui = { path = "crates/bge-gui" }
 bge-clients = { path = "crates/bge-clients" }
+arkaplan-politika = { path = "crates/arkaplan-politika" }
 # Ortak tema (Kilim paleti, Semerkant kâğıdı, kilim çerçeve). git + rev: kardeş
 # depo yolu klonlayan herkeste ve CI'da yok. Tema değişince rev'i güncelle.
 kilim-tema = { git = "https://github.com/Ercaner1988/kilim-tema", rev = "a62bfc71227202fe1173b8f9d36aaa723fd5a12c" }

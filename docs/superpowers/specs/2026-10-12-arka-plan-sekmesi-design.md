@@ -36,7 +36,7 @@ cpu_yuzde = 50             # KULLANICININ işleri bunun üstündeyse durur (1.4)
 kullanirken_dur = true     # son 60 sn'de klavye/fare varsa durur
 [gomme]                    # ibnü'n-Nedim'in toplu işleri, bütün araçlar
 saatler = "her zaman"      # ya da "00:00-06:30"
-duraklat_bitis = 0         # unix sn; 0 = çalışıyor, u64::MAX = "ben sürdürene dek"
+duraklat_bitis = 0         # unix sn; 0 = çalışıyor, i64::MAX = "ben sürdürene dek" (TOML tamsayısı i64)
 [ocr]                      # Nazar'ın kuyruk OCR'ı
 saatler = "00:00-06:30"
 duraklat_bitis = 0
@@ -105,7 +105,8 @@ tesseract). Sınır böylece yalnız kullanıcının çalıştırdığı program
 
 **Satırlar:** "Toplu gömme" ve "OCR" satırlarının her biri şunları içerir:
 
-- durum ve nedeni ("● çalışıyor", "◐ saat dışı", "⏸ 15:40'a dek"),
+- durum ve nedeni: renkli nokta + metin ("çalışıyor", "saat dışı", "duraklatıldı · bitiş 15:40");
+  simge karakteri yok (gömülü yazı tipinde olmayabilir),
 - iki üç sayı: gömmede bugün gömülen metin ve Nazar'ın parça kapsamı; OCR'da kuyruk ve bugün işlenen,
 - ⏸ düğmesi: basınca "1 saat / bugün boyunca / ben sürdürene dek" seçenekleri açılır;
   duraklatılmışken düğme ▶ Sürdür olur,
@@ -165,7 +166,8 @@ daemon küçülür ve kararın kendisi tek bir yerde sınanır.
 - **`ocr_saatleri` kaldırılır:** Bu ayar ayardan ve koddan çıkar, yerini politika dosyasının `[ocr]`
   bölümü alır. Kurulumda politika dosyası şu değerlerle oluşturulur ve `ayar.toml`'daki satır silinir:
   - OCR: 00:00–06:30,
-  - gömme: "her zaman".
+  - gömme: "her zaman",
+  - `kullanirken_dur = false` (bugünkü davranış; sekmeden açılır).
 
 ### 3.3 Durum dosyası
 
