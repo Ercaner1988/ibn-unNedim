@@ -528,6 +528,7 @@ dependencies = [
 name = "bge-gui"
 version = "0.1.0"
 dependencies = [
+ "bge-arkaplan-sekme",
  "bge-clients",
  "bge-connectors",
  "bge-settings",

@@ -11,6 +11,7 @@ bge-settings.workspace = true
 bge-clients.workspace = true
 bge-connectors.workspace = true
 bge-theme.workspace = true
+bge-arkaplan-sekme.workspace = true
 eframe.workspace = true
 kilim-tema.workspace = true
 fihrist-tema = { workspace = true, optional = true }

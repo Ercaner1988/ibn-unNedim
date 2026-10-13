@@ -1,5 +1,5 @@
-//! The three-screen egui GUI from `design/DESIGN.md`: Status, Connections,
-//! Settings, switched by a bottom nav bar. All styling comes from
+//! The four-screen egui GUI from `design/DESIGN.md`: Durum, Bağlantılar,
+//! Ayarlar, Arka plan, switched by a nav bar. All styling comes from
 //! `theme.rs` - no inline hex/spacing/radius/size literals here.
 
 mod autostart;
@@ -19,6 +19,7 @@ enum Screen {
     Status,
     Connections,
     Settings,
+    ArkaPlan,
 }
 
 /// Which action a row's inline "this deletes your data" confirmation (see
@@ -212,6 +213,7 @@ fn spawn_disconnect(tool: Tool, conn: Arc<ConnState>, confirm_reset: bool) {
 
 pub struct GuiApp {
     status: Arc<Status>,
+    arkaplan: bge_arkaplan_sekme::Sekme,
     screen: Screen,
     prev_screen: Screen,
     conn: Arc<ConnState>,
@@ -254,6 +256,7 @@ impl GuiApp {
             },
             model_input: effective_model(),
             tercih,
+            arkaplan: bge_arkaplan_sekme::Sekme::yeni(ctx),
         }
     }
 }
@@ -311,6 +314,7 @@ impl eframe::App for GuiApp {
                                 &mut self.autostart_enabled,
                                 &mut self.model_input,
                             ),
+                            Screen::ArkaPlan => self.arkaplan.ui(ui, p, &self.status),
                         });
                 });
         });
@@ -385,11 +389,12 @@ fn nav_bar(ui: &mut Ui, p: Palette, screen: &mut Screen) {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = theme::GAP_XS;
-                let width = (ui.available_width() - 2.0 * theme::GAP_XS) / 3.0;
+                let width = (ui.available_width() - 3.0 * theme::GAP_XS) / 4.0;
                 for (label, target) in [
                     ("Durum", Screen::Status),
                     ("Bağlantılar", Screen::Connections),
                     ("Ayarlar", Screen::Settings),
+                    ("Arka plan", Screen::ArkaPlan),
                 ] {
                     if theme::nav_tab(ui, p, label, *screen == target, width).clicked() {
                         *screen = target;
