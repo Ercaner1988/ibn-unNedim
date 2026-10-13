@@ -551,7 +551,7 @@ fn stats_row(ui: &mut Ui, p: Palette, status: &Status) {
             status.requests_served.load(Ordering::Relaxed).to_string(),
         ),
         (
-            "Texts embedded",
+            "Texts",
             status.texts_embedded.load(Ordering::Relaxed).to_string(),
         ),
         ("Last latency", last_latency),
@@ -561,12 +561,16 @@ fn stats_row(ui: &mut Ui, p: Palette, status: &Status) {
         for (col, (label, value)) in cols.iter_mut().zip(stats) {
             theme::card(col, p, |ui| {
                 ui.spacing_mut().item_spacing.y = theme::GAP_XS;
-                ui.label(theme::rich(
-                    label,
-                    theme::SIZE_CAPTION,
-                    Weight::Regular,
-                    p.text_muted,
-                ));
+                // Sarılmaz, kırpılır: columns iki yana yaslı; sarılan satır yaslanıp "T e x t s" oluyordu.
+                ui.add(
+                    egui::Label::new(theme::rich(
+                        label,
+                        theme::SIZE_CAPTION,
+                        Weight::Regular,
+                        p.text_muted,
+                    ))
+                    .truncate(),
+                );
                 ui.label(theme::rich(
                     value,
                     theme::SIZE_SUBTITLE,

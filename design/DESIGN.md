@@ -90,7 +90,7 @@ Sections from top to bottom; a flexible spacer pushes the nav bar to the bottom.
    wraps): `Available once the model is loaded. OpenAI-compatible, model name: bge-m3` before
    ready, `OpenAI-compatible · model name: bge-m3` after. Copy disabled until Ready.
 4. **Stats row**: three equal cards, gap 12, each: label (caption, muted) over value
-   (subtitle/600), gap 4 — `Requests`, `Texts embedded`, `Last latency` (`— ms` until first request).
+   (subtitle/600), gap 4 — `Requests`, `Texts`, `Last latency` (etiket sarılmaz, kırpılır) (`— ms` until first request).
 5. Spacer, nav bar.
 
 Failed phase: model card shows the error message in `status.error`, pill = Failed.
