@@ -39,3 +39,11 @@ pub fn yerel_tarih() -> Option<u32> {
     #[cfg(not(windows))]
     None
 }
+
+/// Geçici: Görev 3 gerçek ölçümle değiştirir.
+pub fn olc(_aralik: std::time::Duration) -> crate::Olcum {
+    crate::Olcum {
+        simdi: simdi(),
+        ..Default::default()
+    }
+}

@@ -146,10 +146,95 @@ pub fn duraklat_bitisi(d: Duraklatma, simdi: i64, gun_saniyesi: Option<u32>) -> 
     }
 }
 
+use crate::Okuyucu;
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::time::Duration;
+
+/// Politika kapısı: dosyayı okur, ölçer, karar verir; bellek eşiğinin önceki hâlini ve son nedeni tutar.
+pub struct Kapi {
+    okuyucu: Okuyucu,
+    bellek_dar: AtomicBool,
+    son: Mutex<Option<Neden>>,
+}
+
+impl Kapi {
+    pub fn yeni(politika: PathBuf) -> Self {
+        Self {
+            okuyucu: Okuyucu::yeni(politika),
+            bellek_dar: AtomicBool::new(false),
+            son: Mutex::new(None),
+        }
+    }
+
+    /// İş şimdi koşabilir mi. Dosya yoksa (ya da hiç geçerli okunmadıysa) `varsayilan`; o da yoksa
+    /// ölçmeden izin. Ölçüm ~1 sn sürer (CPU örneği): çizim ya da async iş parçacığında çağrılmaz.
+    /// ponytail: duraklatma/saat engelinde de CPU ölçülür (1 sn boşa); sık çağrılırsa önce ucuz koşullar.
+    pub fn dene(&self, is: IsTuru, varsayilan: Option<&Politika>) -> Result<(), Neden> {
+        let p = match (self.okuyucu.etkin(), varsayilan) {
+            (Some(p), _) => p,
+            (None, Some(v)) => v.clone(),
+            (None, None) => {
+                *self.son.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                return Ok(());
+            }
+        };
+        let o = crate::sistem::olc(Duration::from_secs(1));
+        let onceki = self.bellek_dar.load(Relaxed);
+        self.bellek_dar.store(
+            o.bellek
+                .is_some_and(|y| bellek_dar_mi(p.sinirlar.bellek_yuzde, y, onceki)),
+            Relaxed,
+        );
+        let r = karar(&p, is, &o, onceki);
+        *self.son.lock().unwrap_or_else(|e| e.into_inner()) = r.err();
+        r
+    }
+
+    pub fn son_neden(&self) -> Option<Neden> {
+        *self.son.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub fn okuyucu(&self) -> &Okuyucu {
+        &self.okuyucu
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{Politika, SURDURENE_DEK};
+
+    #[test]
+    fn dosya_yokken_izin_olcmeden() {
+        let k = Kapi::yeni(std::env::temp_dir().join("arkaplan-politika-hic-yok.toml"));
+        let bas = std::time::Instant::now();
+        assert_eq!(k.dene(IsTuru::Gomme, None), Ok(()));
+        assert!(
+            bas.elapsed() < std::time::Duration::from_millis(200),
+            "ölçüm (1 sn) yapılmamalı"
+        );
+        assert_eq!(k.son_neden(), None);
+    }
+
+    #[test]
+    fn duraklatilmis_dosyada_kapi_keser() {
+        let yol = std::env::temp_dir().join(format!(
+            "arkaplan-politika-kapi-{}.toml",
+            std::process::id()
+        ));
+        let mut p = Politika::default();
+        p.gomme.duraklat_bitis = SURDURENE_DEK;
+        crate::yaz(&yol, &p).unwrap();
+        let k = Kapi::yeni(yol.clone());
+        let beklenen = Neden::Duraklatildi {
+            bitis: SURDURENE_DEK,
+        };
+        assert_eq!(k.dene(IsTuru::Gomme, None), Err(beklenen));
+        assert_eq!(k.son_neden(), Some(beklenen));
+        let _ = std::fs::remove_file(yol);
+    }
 
     fn olcum() -> Olcum {
         Olcum {
