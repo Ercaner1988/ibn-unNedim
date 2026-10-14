@@ -136,10 +136,10 @@ pub fn model_config_path() -> std::path::PathBuf {
 /// `BGE_MODEL` env var wins (so `start.ps1`-style launchers stay in control);
 /// otherwise the Settings screen's last saved choice; otherwise `DEFAULT_MODEL`.
 pub fn effective_model() -> String {
-    if let Ok(v) = std::env::var("BGE_MODEL") {
-        if !v.trim().is_empty() {
-            return v;
-        }
+    if let Ok(v) = std::env::var("BGE_MODEL")
+        && !v.trim().is_empty()
+    {
+        return v;
     }
     if let Ok(saved) = std::fs::read_to_string(model_config_path()) {
         let saved = saved.trim();

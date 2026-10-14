@@ -386,7 +386,7 @@ pub fn status_pill(ui: &mut Ui, p: Palette, dot_color: Color32, label: &str) -> 
 /// One of the three bottom nav tabs. Active = paper tinted with the accent
 /// (the grain shows, so it sits with the kilim border instead of a flat blue)
 /// + `accent.on` label (600); inactive = sunken paper + its contrasting
-/// muted ink (500).
+///   muted ink (500).
 pub fn nav_tab(ui: &mut Ui, p: Palette, label: &str, active: bool, width: f32) -> Response {
     let s = sunken(ui.ctx());
     let text = rich(

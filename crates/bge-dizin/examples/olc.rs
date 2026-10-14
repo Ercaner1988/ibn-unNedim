@@ -47,8 +47,10 @@ fn dosyadan(yol: &str, d: usize) -> Result<Vec<Vec<f32>>, String> {
     }
     Ok(b.chunks_exact(4 * d)
         .map(|r| {
-            r.chunks_exact(4)
-                .map(|x| f32::from_le_bytes([x[0], x[1], x[2], x[3]]))
+            r.as_chunks::<4>()
+                .0
+                .iter()
+                .map(|x| f32::from_le_bytes(*x))
                 .collect()
         })
         .collect())

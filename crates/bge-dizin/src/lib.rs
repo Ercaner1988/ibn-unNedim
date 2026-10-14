@@ -117,15 +117,15 @@ impl PartialOrd for Aday {
 /// Sekiz şeritli iç çarpım: derleyici SIMD'e çevirebilsin diye kısmi toplamlar ayrı.
 fn ic_carpim(a: &[f32], b: &[f32]) -> f32 {
     let mut t = [0f32; 8];
-    let mut ka = a.chunks_exact(8);
-    let mut kb = b.chunks_exact(8);
-    for (x, y) in ka.by_ref().zip(kb.by_ref()) {
+    let (ka, ra) = a.as_chunks::<8>();
+    let (kb, rb) = b.as_chunks::<8>();
+    for (x, y) in ka.iter().zip(kb.iter()) {
         for i in 0..8 {
             t[i] += x[i] * y[i];
         }
     }
     let mut s: f32 = t.iter().sum();
-    for (x, y) in ka.remainder().iter().zip(kb.remainder()) {
+    for (x, y) in ra.iter().zip(rb.iter()) {
         s += x * y;
     }
     s

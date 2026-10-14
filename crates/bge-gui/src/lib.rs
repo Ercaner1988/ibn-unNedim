@@ -522,10 +522,10 @@ fn endpoint_card_body(ui: &mut Ui, p: Palette, phase: Option<&Phase>) {
     // the window off-screen.
     ui.horizontal(|ui| {
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if theme::primary_button(ui, p, "Copy", ready_url.is_some()).clicked() {
-                if let Some(url) = &ready_url {
-                    ui.ctx().copy_text(url.clone());
-                }
+            if theme::primary_button(ui, p, "Copy", ready_url.is_some()).clicked()
+                && let Some(url) = &ready_url
+            {
+                ui.ctx().copy_text(url.clone());
             }
             ui.add_space(theme::GAP_SM);
             theme::url_field(ui, p, &display_url);
@@ -667,10 +667,8 @@ fn tool_row(ui: &mut Ui, p: Palette, tool: Tool, conn: &Arc<ConnState>) -> bool 
             if theme::secondary_button(ui, p, "Disconnect", enabled).clicked() {
                 spawn_disconnect(tool, conn.clone(), false);
             }
-        } else if show_connect {
-            if theme::primary_button(ui, p, "Connect", enabled).clicked() {
-                spawn_connect(tool, conn.clone(), false);
-            }
+        } else if show_connect && theme::primary_button(ui, p, "Connect", enabled).clicked() {
+            spawn_connect(tool, conn.clone(), false);
         }
         // Re-checking lives in the card header ("Re-check all").
     });
@@ -1132,10 +1130,10 @@ fn settings_screen(
             theme::MODEL_INPUT_WIDTH,
             |ui| {
                 let size = egui::Vec2::new(theme::MODEL_INPUT_WIDTH, theme::INPUT_HEIGHT);
-                if theme::text_input(ui, p, model_input, size).changed() {
-                    if let Err(e) = crate::save_model_setting(model_input) {
-                        eprintln!("could not save model setting: {e}");
-                    }
+                if theme::text_input(ui, p, model_input, size).changed()
+                    && let Err(e) = crate::save_model_setting(model_input)
+                {
+                    eprintln!("could not save model setting: {e}");
                 }
             },
         );
@@ -1160,12 +1158,12 @@ fn settings_screen(
             "Opens İbnü'n-Nedîm Gömme automatically when you log in.",
             theme::TOGGLE_WIDTH,
             |ui| {
-                if theme::toggle(ui, p, autostart_enabled).changed() {
-                    if let Err(e) = autostart::set_enabled(*autostart_enabled) {
-                        eprintln!("could not update start-on-login: {e}");
-                        // Reflect what's actually registered, not the failed intent.
-                        *autostart_enabled = autostart::is_enabled();
-                    }
+                if theme::toggle(ui, p, autostart_enabled).changed()
+                    && let Err(e) = autostart::set_enabled(*autostart_enabled)
+                {
+                    eprintln!("could not update start-on-login: {e}");
+                    // Reflect what's actually registered, not the failed intent.
+                    *autostart_enabled = autostart::is_enabled();
                 }
             },
         );

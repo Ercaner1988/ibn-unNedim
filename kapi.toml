@@ -1,0 +1,21 @@
+# ibn-unNedim (bge-embed-rs) altin-kapi beyani. Değer: "uygulanir" ya da "uygulanmaz".
+
+repo = "bge-embed-rs"
+
+[boyut]
+arkayuz = "uygulanir"
+onyuz = "uygulanir"
+veritabani = "uygulanmaz"
+makine_zararsizligi = "uygulanir"
+tedarik_guvenligi = "uygulanir"
+bellek_guvenligi = "uygulanir"
+kimlik_yolu = "uygulanmaz"
+yayina_hazirlik = "uygulanir"
+kaynak_tuketimi = "uygulanir"
+birlikte_calisabilirlik = "uygulanir"
+karakter_yazimi = "uygulanir"
+hata_disiplini = "uygulanir"
+test_gercekciligi = "uygulanir"
+veri_dayanikliligi = "uygulanmaz"
+surum_izi = "uygulanir"
+belge_dogrulugu = "uygulanir"

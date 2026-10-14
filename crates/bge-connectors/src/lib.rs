@@ -375,9 +375,9 @@ impl OpenNotebook {
     ///    is already taken by a model on a *different* credential (e.g. the
     ///    user's existing bge-m3 wired to some other server on another port)
     ///    - Open Notebook has no rename/update endpoint and DELETE would
-    ///    destroy someone else's working setup, so we pick a distinct name
-    ///    instead. The model field in `/v1/embeddings` requests is ignored by
-    ///    this server, so the name is free-form.
+    ///      destroy someone else's working setup, so we pick a distinct name
+    ///      instead. The model field in `/v1/embeddings` requests is ignored by
+    ///      this server, so the name is free-form.
     fn find_or_create_model(
         agent: &ureq::Agent,
         base_url: &str,
@@ -747,6 +747,7 @@ impl OpenWebUi {
     /// empty engine string, meaning local sentence-transformers
     /// (backend/open_webui/config.py:1002: `os.getenv('RAG_EMBEDDING_ENGINE', '')`)
     /// - if it's currently pointed at us; a no-op (`Ok(false)`) otherwise.
+    ///
     /// Per DESIGN.md caption: existing knowledge bases need re-indexing in
     /// Open WebUI after this, same as connecting.
     pub fn disconnect(base_url: &str, embed_url: &str, key: Option<&str>) -> anyhow::Result<bool> {
@@ -1318,8 +1319,10 @@ mod tests {
     }
 
     fn spawn_fake_server(password: Option<&'static str>) -> (String, Shared) {
-        let mut init = FakeState::default();
-        init.password = password;
+        let init = FakeState {
+            password,
+            ..Default::default()
+        };
         let state: Shared = Arc::new(Mutex::new(init));
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
@@ -1706,8 +1709,10 @@ mod owui_tests {
     }
 
     fn spawn_fake_server(admin_key: Option<&'static str>) -> (String, Shared) {
-        let mut init = FakeState::default();
-        init.admin_key = admin_key;
+        let init = FakeState {
+            admin_key,
+            ..Default::default()
+        };
         let state: Shared = Arc::new(Mutex::new(init));
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
@@ -1943,9 +1948,11 @@ mod anythingllm_tests {
         dev_key: Option<&'static str>,
         reject_base_path_with: Option<&'static str>,
     ) -> (String, Shared) {
-        let mut init = FakeState::default();
-        init.dev_key = dev_key;
-        init.reject_base_path_with = reject_base_path_with;
+        let init = FakeState {
+            dev_key,
+            reject_base_path_with,
+            ..Default::default()
+        };
         let state: Shared = Arc::new(Mutex::new(init));
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
