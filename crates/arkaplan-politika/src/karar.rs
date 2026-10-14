@@ -157,7 +157,12 @@ pub struct Kapi {
     okuyucu: Okuyucu,
     bellek_dar: AtomicBool,
     son: Mutex<Option<Neden>>,
+    /// Son ölçüm; `OLCUM_OMRU` içinde yeniden kullanılır.
+    olcum: Mutex<Option<(std::time::Instant, Olcum)>>,
 }
+
+/// Ölçüm 1 sn uyur; art arda gelen toplu istekler (ve nazard'ın dilimleri) bunu her seferinde ödemesin.
+const OLCUM_OMRU: Duration = Duration::from_secs(5);
 
 impl Kapi {
     pub fn yeni(politika: PathBuf) -> Self {
@@ -165,12 +170,13 @@ impl Kapi {
             okuyucu: Okuyucu::yeni(politika),
             bellek_dar: AtomicBool::new(false),
             son: Mutex::new(None),
+            olcum: Mutex::new(None),
         }
     }
 
     /// İş şimdi koşabilir mi. Dosya yoksa (ya da hiç geçerli okunmadıysa) `varsayilan`; o da yoksa
     /// ölçmeden izin. Ölçüm ~1 sn sürer (CPU örneği): çizim ya da async iş parçacığında çağrılmaz.
-    /// ponytail: duraklatma/saat engelinde de CPU ölçülür (1 sn boşa); sık çağrılırsa önce ucuz koşullar.
+    /// Son ölçüm 5 sn içindeyse yeniden kullanılır (duraklatma bitişi en çok 5 sn geç görülür).
     pub fn dene(&self, is: IsTuru, varsayilan: Option<&Politika>) -> Result<(), Neden> {
         let p = match (self.okuyucu.etkin(), varsayilan) {
             (Some(p), _) => p,
@@ -180,7 +186,7 @@ impl Kapi {
                 return Ok(());
             }
         };
-        let o = crate::sistem::olc(Duration::from_secs(1));
+        let o = self.olc();
         let onceki = self.bellek_dar.load(Relaxed);
         self.bellek_dar.store(
             o.bellek
@@ -190,6 +196,18 @@ impl Kapi {
         let r = karar(&p, is, &o, onceki);
         *self.son.lock().unwrap_or_else(|e| e.into_inner()) = r.err();
         r
+    }
+
+    fn olc(&self) -> Olcum {
+        let mut son = self.olcum.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((t, o)) = *son
+            && t.elapsed() < OLCUM_OMRU
+        {
+            return o;
+        }
+        let o = crate::sistem::olc(Duration::from_secs(1));
+        *son = Some((std::time::Instant::now(), o));
+        o
     }
 
     pub fn son_neden(&self) -> Option<Neden> {
@@ -233,6 +251,30 @@ mod tests {
         };
         assert_eq!(k.dene(IsTuru::Gomme, None), Err(beklenen));
         assert_eq!(k.son_neden(), Some(beklenen));
+        let _ = std::fs::remove_file(yol);
+    }
+
+    #[test]
+    fn ardisik_izinler_olcumu_yinelemez() {
+        // Her toplu istek ve nazard'ın her gömme dilimi 1 sn ölçüm bekliyordu (iki kapıdan geçen
+        // dilim 2 sn); 5 sn içindeki ikinci soru son ölçümü kullanır.
+        let yol = std::env::temp_dir().join(format!(
+            "arkaplan-politika-ardisik-{}.toml",
+            std::process::id()
+        ));
+        let mut p = Politika::default();
+        p.sinirlar.bellek_yuzde = 100;
+        p.sinirlar.cpu_yuzde = 100;
+        crate::yaz(&yol, &p).unwrap();
+        let k = Kapi::yeni(yol.clone());
+        assert_eq!(k.dene(IsTuru::Gomme, None), Ok(()));
+        let bas = std::time::Instant::now();
+        assert_eq!(k.dene(IsTuru::Gomme, None), Ok(()));
+        assert!(
+            bas.elapsed() < std::time::Duration::from_millis(500),
+            "ikinci soru yeniden ölçtü: {:?}",
+            bas.elapsed()
+        );
         let _ = std::fs::remove_file(yol);
     }
 
