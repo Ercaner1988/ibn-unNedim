@@ -72,6 +72,9 @@ axum = "0.8"
 # Vulkan yoklaması (wgpu bağdaştırıcı sayımı eşzamansız); ağaçta zaten var, yeni crate eklemez.
 pollster = "1"
 
+[dev-dependencies]
+arkaplan-politika.workspace = true
+
 [features]
 # Tema menüsüne el-Fihrist kataloğunu ekler; kapalıyken yalnız yerleşik tema var.
 fihrist = ["bge-gui/fihrist"]

@@ -2262,6 +2262,7 @@ name = "ibnun-nedim"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arkaplan-politika",
  "axum",
  "bge-clients",
  "bge-gui",

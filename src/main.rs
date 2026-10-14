@@ -631,6 +631,27 @@ async fn gom(
     let inputs = req.input.into_vec();
     let text_count = inputs.len();
     let started = std::time::Instant::now();
+    // Iki serit: tek ve kisa metinli istek (arama sorgusu) kapiyi atlar; toplu istekler
+    // (Open Notebook) TOPLU_KAPI'dan birer birer gecer. Kapi yokken N eszamanli toplu istek
+    // N*parallel is parcacigi aciyordu ve kisa sorgu CPU'dan 1/(N*parallel+1) pay aliyordu
+    // (2026-09-25 olculdu: ayni sorgu yuk altinda 7,4 / 47 / 2,8 sn, bosken ~0,65 sn).
+    let hizli = kisa_mi(&inputs);
+    // Toplu izin modelden ÖNCE: duraklatma ya da bellek sınırı tutarken boşaltılmış model
+    // yeniden yüklenmesin (bekleyen istek modeli bellekte de tutardı).
+    let izin = if hizli {
+        None
+    } else {
+        Some(
+            toplu_izin(
+                &TOPLU_KAPI,
+                &bge_clients::politika::KAPI,
+                std::time::Duration::from_secs(5),
+                |e| bekci.evre(e, text_count),
+            )
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
+        )
+    };
     let model = {
         let _evre = bekci.evre(Evre::ModelBekliyor, text_count);
         state
@@ -638,27 +659,6 @@ async fn gom(
             .al()
             .await
             .map_err(|e| (StatusCode::SERVICE_UNAVAILABLE, e.to_string()))?
-    };
-    // Iki serit: tek ve kisa metinli istek (arama sorgusu) kapiyi atlar; toplu istekler
-    // (Open Notebook) TOPLU_KAPI'dan birer birer gecer. Kapi yokken N eszamanli toplu istek
-    // N*parallel is parcacigi aciyordu ve kisa sorgu CPU'dan 1/(N*parallel+1) pay aliyordu
-    // (2026-09-25 olculdu: ayni sorgu yuk altinda 7,4 / 47 / 2,8 sn, bosken ~0,65 sn).
-    let hizli = kisa_mi(&inputs);
-    if !hizli {
-        // Arka plan politikası (Arka plan sekmesi); dosya yoksa hemen geçer.
-        let _evre = bekci.evre(Evre::PolitikaBekliyor, text_count);
-        let _ = tokio::task::spawn_blocking(bge_clients::politika::bekle).await;
-    }
-    let izin = if hizli {
-        None
-    } else {
-        let _evre = bekci.evre(Evre::SiraBekliyor, text_count);
-        Some(
-            TOPLU_KAPI
-                .acquire()
-                .await
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?,
-        )
     };
     // Girdiler uzunluğa göre partilenir (en fazla `BGE_PARALLEL` parti aynı anda); her parti
     // tek ileri geçiştir ve rayon ile tüm çekirdeklere yayılır (bkz. hizli.rs).
@@ -735,6 +735,33 @@ static TOPLU_KAPI: std::sync::LazyLock<tokio::sync::Semaphore> = std::sync::Lazy
     tokio::sync::Semaphore::new(izin)
 });
 const VARSAYILAN_TOPLU_IZIN: usize = 1;
+
+/// Toplu isteğin izni: önce sıra (`sira`), sıra gelince arka plan politikası (Arka plan sekmesi).
+/// Politika izin vermezse sıra bırakılır, `aralik` sonra yeniden denenir. Bekleme async'tir:
+/// istemci vazgeçince gelecek düşer, döngü de biter (engelleyici iş parçacığı sızmaz). Politika
+/// sıradan SONRA sorulur: sırada beklerken duraklatılan iş hesaplamaya başlamaz.
+async fn toplu_izin<G>(
+    sira: &'static tokio::sync::Semaphore,
+    kapi: &'static bge_clients::politika::Kapi,
+    aralik: std::time::Duration,
+    evre: impl Fn(Evre) -> G,
+) -> Result<tokio::sync::SemaphorePermit<'static>, tokio::sync::AcquireError> {
+    loop {
+        let izin = {
+            let _e = evre(Evre::SiraBekliyor);
+            sira.acquire().await?
+        };
+        let gecer = tokio::task::spawn_blocking(move || bge_clients::politika::gecer(kapi))
+            .await
+            .unwrap_or(true);
+        if gecer {
+            return Ok(izin);
+        }
+        drop(izin);
+        let _e = evre(Evre::PolitikaBekliyor);
+        tokio::time::sleep(aralik).await;
+    }
+}
 
 /// Hızlı şerit kapıyı atlamakla kalmaz, üç şeyle önce geçer (ölçüm 2026-10-05, 32×800
 /// belirteçlik toplu yük döngüsü altında 7 belirteçlik sorgu):
@@ -1052,6 +1079,80 @@ mod tests {
             8192
         );
         assert!(tok.encode("kisa metin", true).unwrap().get_ids().len() < 10);
+    }
+
+    /// Sınama politika dosyası: `duraklat` ise "ben sürdürene dek", değilse sınırsız (makine yükü
+    /// kararı bozmasın). mtime ileri alınır: okuyucu değişikliği kesin görsün.
+    fn politika_yaz(yol: &std::path::Path, duraklat: bool, ileri_sn: u64) {
+        let mut p = arkaplan_politika::Politika::default();
+        p.sinirlar.bellek_yuzde = 100;
+        p.sinirlar.cpu_yuzde = 100;
+        if duraklat {
+            p.gomme.duraklat_bitis = arkaplan_politika::SURDURENE_DEK;
+        }
+        arkaplan_politika::yaz(yol, &p).unwrap();
+        let f = std::fs::OpenOptions::new().write(true).open(yol).unwrap();
+        f.set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(ileri_sn))
+            .unwrap();
+    }
+
+    fn sinama_kapisi(ad: &str) -> (std::path::PathBuf, &'static bge_clients::politika::Kapi) {
+        let yol =
+            std::env::temp_dir().join(format!("bge-toplu-izin-{ad}-{}.toml", std::process::id()));
+        let kapi = Box::leak(Box::new(bge_clients::politika::Kapi::yeni(yol.clone())));
+        (yol, kapi)
+    }
+
+    #[test]
+    fn toplu_izin_vazgecilince_is_parcacigi_birakir() {
+        // İstemci vazgeçince (gelecek düşer) bekleme de bitmeli; eskiden spawn_blocking içindeki
+        // döngü sonsuza dek sürüp engelleyici havuzu tüketiyordu.
+        let (yol, kapi) = sinama_kapisi("vazgec");
+        politika_yaz(&yol, true, 0);
+        let sira: &'static _ = Box::leak(Box::new(tokio::sync::Semaphore::new(1)));
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .max_blocking_threads(1)
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let aralik = std::time::Duration::from_millis(50);
+            let bekleme = toplu_izin(sira, kapi, aralik, |_| ());
+            let r = tokio::time::timeout(std::time::Duration::from_millis(1500), bekleme).await;
+            assert!(r.is_err(), "duraklatılmışken izin verildi");
+            let baska = tokio::task::spawn_blocking(|| 1);
+            let r = tokio::time::timeout(std::time::Duration::from_secs(4), baska).await;
+            assert!(
+                r.is_ok(),
+                "vazgeçilen bekleme engelleyici iş parçacığını tutuyor"
+            );
+        });
+        let _ = std::fs::remove_file(yol);
+    }
+
+    #[test]
+    fn toplu_izin_siradan_sonra_politikaya_yeniden_bakar() {
+        // Sırada beklerken duraklatılırsa, sıra açılınca hesaplamaya başlamamalı.
+        let (yol, kapi) = sinama_kapisi("sira");
+        politika_yaz(&yol, false, 0);
+        let sira: &'static _ = Box::leak(Box::new(tokio::sync::Semaphore::new(1)));
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let tutulan = sira.acquire().await.unwrap();
+            let aralik = std::time::Duration::from_millis(50);
+            let is =
+                tokio::spawn(async move { toplu_izin(sira, kapi, aralik, |_| ()).await.map(drop) });
+            tokio::time::sleep(std::time::Duration::from_millis(2500)).await; // sırada
+            politika_yaz(&yol, true, 5);
+            drop(tutulan);
+            tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+            assert!(!is.is_finished(), "sıra açılınca duraklatmaya rağmen geçti");
+            is.abort();
+        });
+        let _ = std::fs::remove_file(yol);
     }
 
     #[test]

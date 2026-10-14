@@ -74,7 +74,12 @@ impl Okuyucu {
             *son = (None, Okuma::Yok);
             return Okuma::Yok;
         };
-        if son.0 == Some(tarih) {
+        // Son 2 sn'de değişmiş dosyada tarihe güvenilmez: NTFS ~15 ms çözünürlükte iki hızlı yazım
+        // (sekmede sürükleme) aynı tarihi taşır, ikincisi önbellekte kaybolurdu.
+        let taze = SystemTime::now()
+            .duration_since(tarih)
+            .map_or(true, |d| d < std::time::Duration::from_secs(2));
+        if !taze && son.0 == Some(tarih) {
             return son.1.clone();
         }
         let onceki = match &son.1 {
@@ -82,26 +87,36 @@ impl Okuyucu {
             Okuma::Bozuk { son_gecerli, .. } => son_gecerli.clone(),
             Okuma::Yok => None,
         };
-        let yeni = match fs::read_to_string(&self.yol) {
+        // G/Ç hatası (antivirüs/indeksleyici kilidi) geçicidir: önbelleğe girmez, sonraki okuma
+        // yeniden dener. Yalnız ayrıştırma hatası dosya değişene dek önbellekte kalır.
+        let (yeni, onbellek) = match fs::read_to_string(&self.yol) {
             Ok(m) => match Politika::ayristir(&m) {
-                Ok(p) => Okuma::Gecerli(p),
-                Err(hata) => Okuma::Bozuk {
-                    hata,
+                Ok(p) => (Okuma::Gecerli(p), Some(tarih)),
+                Err(hata) => (
+                    Okuma::Bozuk {
+                        hata,
+                        son_gecerli: onceki,
+                    },
+                    Some(tarih),
+                ),
+            },
+            Err(e) => (
+                Okuma::Bozuk {
+                    hata: e.to_string(),
                     son_gecerli: onceki,
                 },
-            },
-            Err(e) => Okuma::Bozuk {
-                hata: e.to_string(),
-                son_gecerli: onceki,
-            },
+                None,
+            ),
         };
-        if let Okuma::Bozuk { hata, .. } = &yeni {
+        if let Okuma::Bozuk { hata, .. } = &yeni
+            && son.1 != yeni
+        {
             eprintln!(
                 "{} okunamadı, son geçerli politika sürüyor: {hata}",
                 self.yol.display()
             );
         }
-        *son = (Some(tarih), yeni.clone());
+        *son = (onbellek, yeni.clone());
         yeni
     }
 
@@ -207,6 +222,58 @@ mod tests {
             fs::read_to_string(&yol).unwrap().contains("gece"),
             "dosyanın üstüne yazılmaz"
         );
+    }
+
+    /// Yazar `metin`i, değişme tarihini tam `t`ye koyar (NTFS ~15 ms çözünürlüğünde iki hızlı yazım).
+    fn yaz_tarihli(yol: &Path, metin: &str, t: SystemTime) {
+        fs::write(yol, metin).unwrap();
+        let f = fs::OpenOptions::new().write(true).open(yol).unwrap();
+        f.set_modified(t).unwrap();
+    }
+
+    #[test]
+    fn ayni_tarihli_ikinci_yazim_okunur() {
+        // Sekmede sürükleme: iki yazım aynı mtime'a düşer; okuyucu ilkini önbellekleyip ikinciyi
+        // bir sonraki yazıma dek görmüyordu.
+        let yol = gecici("ayni-tarih");
+        let o = Okuyucu::yeni(yol.clone());
+        let t = SystemTime::now();
+        let mut p = Politika::default();
+        p.sinirlar.cpu_yuzde = 50;
+        yaz_tarihli(&yol, &p.metin(), t);
+        assert_eq!(o.oku(), Okuma::Gecerli(p.clone()));
+        p.sinirlar.cpu_yuzde = 60;
+        yaz_tarihli(&yol, &p.metin(), t);
+        assert_eq!(o.oku(), Okuma::Gecerli(p));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn kilitli_dosya_hatasi_onbellege_girmez() {
+        // Antivirüs/indeksleyici dosyayı o an kilitlerse okuma hatası önbelleğe girip, dosya bir daha
+        // değişene dek yeni politika hiç uygulanmıyordu.
+        use std::os::windows::fs::OpenOptionsExt;
+        let yol = gecici("kilit");
+        let o = Okuyucu::yeni(yol.clone());
+        let mut p = Politika::default();
+        p.gomme.duraklat_bitis = crate::SURDURENE_DEK;
+        yaz_tarihli(
+            &yol,
+            &p.metin(),
+            SystemTime::now() - Duration::from_secs(60),
+        );
+        let kilit = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&yol)
+            .unwrap();
+        let ilk = o.oku();
+        assert!(
+            !matches!(ilk, Okuma::Gecerli(_)),
+            "kilitliyken okunamamalı: {ilk:?}"
+        );
+        drop(kilit);
+        assert_eq!(o.oku(), Okuma::Gecerli(p), "kilit kalkınca okunmalı");
     }
 
     #[test]
