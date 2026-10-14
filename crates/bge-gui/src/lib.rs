@@ -240,7 +240,7 @@ impl GuiApp {
         tercih.uygula(ctx);
         theme::apply_visuals(ctx);
         Self {
-            status,
+            status: Arc::clone(&status),
             screen: Screen::Status,
             prev_screen: Screen::Status,
             conn: Arc::new(ConnState::default()),
@@ -256,7 +256,7 @@ impl GuiApp {
             },
             model_input: effective_model(),
             tercih,
-            arkaplan: bge_arkaplan_sekme::Sekme::yeni(ctx),
+            arkaplan: bge_arkaplan_sekme::Sekme::yeni(ctx, status),
         }
     }
 }
@@ -314,7 +314,7 @@ impl eframe::App for GuiApp {
                                 &mut self.autostart_enabled,
                                 &mut self.model_input,
                             ),
-                            Screen::ArkaPlan => self.arkaplan.ui(ui, p, &self.status),
+                            Screen::ArkaPlan => self.arkaplan.ui(ui, p),
                         });
                 });
         });

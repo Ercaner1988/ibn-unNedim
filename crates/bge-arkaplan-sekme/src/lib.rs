@@ -21,6 +21,8 @@ struct Anlik {
     okuma: Okuma,
     nazar: Option<ArkaplanDurumu>,
     yazma_hatasi: Option<String>,
+    /// Bugün gömülen metin; işçi 5 sn'de bir sayar (sekme hiç açılmasa da gün dönümü kaçmaz).
+    bugun: u64,
 }
 
 /// Anahtar sütununun genişliği (`alan_satiri`).
@@ -31,8 +33,6 @@ pub struct Sekme {
     rx: Receiver<Anlik>,
     tx: Sender<Politika>,
     anlik: Option<Anlik>,
-    /// (tarih, gün başındaki `texts_embedded`).
-    bugun_baz: (Option<u32>, u64),
     /// Saat kutuları [gömme, ocr] × (baş, son); işçiden yeni anlık gelince doldurulur.
     saat: [(String, String); 2],
     saat_hatasi: [bool; 2],
@@ -42,7 +42,7 @@ pub struct Sekme {
 impl Sekme {
     /// Dosya işini yapan işçiyi açar: 5 sn'de bir (ya da yazma isteği gelince) okur, değişiklik
     /// varsa gönderir ve yeniden çizim ister. Çizim iş parçacığı dosyaya dokunmaz.
-    pub fn yeni(ctx: &egui::Context) -> Self {
+    pub fn yeni(ctx: &egui::Context, status: std::sync::Arc<Status>) -> Self {
         let (atx, arx) = channel::<Anlik>();
         let (ptx, prx) = channel::<Politika>();
         let ctx = ctx.clone();
@@ -53,11 +53,18 @@ impl Sekme {
                 let durum = ap::durum_yolu();
                 let mut onceki: Option<Anlik> = None;
                 let mut yazma_hatasi = None;
+                // (tarih, gün başındaki `texts_embedded`); sayaç süreç açılınca 0'dan başlar.
+                let mut taban = (ap::sistem::yerel_tarih(), 0);
                 loop {
                     let a = Anlik {
                         okuma: okuyucu.oku(),
                         nazar: ap::durum_oku(&durum),
                         yazma_hatasi: yazma_hatasi.take(),
+                        bugun: bugun_farki(
+                            &mut taban,
+                            ap::sistem::yerel_tarih(),
+                            status.texts_embedded.load(Ordering::Relaxed),
+                        ),
                     };
                     if onceki.as_ref() != Some(&a) {
                         if atx.send(a.clone()).is_err() {
@@ -86,7 +93,6 @@ impl Sekme {
             rx: arx,
             tx: ptx,
             anlik: None,
-            bugun_baz: (ap::sistem::yerel_tarih(), 0),
             saat: Default::default(),
             saat_hatasi: [false; 2],
             menu: None,
@@ -138,19 +144,19 @@ impl Sekme {
             .filter(|d| simdi - d.zaman <= BAYAT_SN)
     }
 
-    pub fn ui(&mut self, ui: &mut Ui, p: Palette, status: &Status) {
-        let mut yeni = false;
+    pub fn ui(&mut self, ui: &mut Ui, p: Palette) {
+        let onceki = self.anlik.as_ref().map(|a| a.okuma.clone());
         while let Ok(a) = self.rx.try_recv() {
             self.anlik = Some(a);
-            yeni = true;
         }
-        if yeni {
+        // Yalnız politika değişince: Nazar durumu ~10 sn'de bir gelir, yazılmakta olan saati ezerdi.
+        if self.anlik.as_ref().map(|a| &a.okuma) != onceki.as_ref() {
             self.saatleri_doldur();
         }
         let simdi = ap::sistem::simdi();
         let gun_sn = ap::sistem::gun_saniyesi();
         self.render_dosya_notu(ui, p);
-        self.render_gomme(ui, p, status, simdi, gun_sn);
+        self.render_gomme(ui, p, simdi, gun_sn);
         ui.add_space(theme::GAP_MD);
         self.render_ocr(ui, p, simdi, gun_sn);
         ui.add_space(theme::GAP_MD);
@@ -183,14 +189,7 @@ impl Sekme {
         ui.add_space(theme::GAP_SM);
     }
 
-    fn render_gomme(
-        &mut self,
-        ui: &mut Ui,
-        p: Palette,
-        status: &Status,
-        simdi: i64,
-        gun_sn: Option<u32>,
-    ) {
+    fn render_gomme(&mut self, ui: &mut Ui, p: Palette, simdi: i64, gun_sn: Option<u32>) {
         let pol = self.politika();
         let isler = bge_clients::defter().isler();
         let bekleyen = isler
@@ -207,8 +206,7 @@ impl Sekme {
             bekleyen,
             hesaplanan,
         );
-        let toplam = status.texts_embedded.load(Ordering::Relaxed);
-        let bugun = bugun_farki(&mut self.bugun_baz, ap::sistem::yerel_tarih(), toplam);
+        let bugun = self.anlik.as_ref().map_or(0, |a| a.bugun);
         let mut sayilar = format!("bugün {bugun} metin");
         if let Some(d) = self.taze_nazar(simdi) {
             sayilar += &format!(
@@ -397,13 +395,20 @@ impl Sekme {
                     .add(
                         egui::DragValue::new(&mut bellek)
                             .range(50..=99)
+                            // Elle yazılmış aralık dışı değer (ör. 100 = sınır yok) kırpılıp dosyaya yazılmasın.
+                            .clamp_existing_to_range(false)
                             .suffix(" %"),
                     )
                     .changed();
             });
             kilim_tema::alan_satiri(ui, ANAHTAR, "İşlemci", |ui| {
                 degisti |= ui
-                    .add(egui::DragValue::new(&mut cpu).range(10..=95).suffix(" %"))
+                    .add(
+                        egui::DragValue::new(&mut cpu)
+                            .range(10..=95)
+                            .clamp_existing_to_range(false)
+                            .suffix(" %"),
+                    )
                     .changed();
             });
             kilim_tema::alan_satiri(ui, ANAHTAR, "Kullanırken", |ui| {
@@ -461,6 +466,77 @@ fn saat_araligi(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// İşçisiz sekme: anlıkları sınama gönderir, yazma isteklerini sınama okur.
+    fn isciz() -> (Sekme, Sender<Anlik>, Receiver<Politika>) {
+        let (atx, arx) = channel();
+        let (ptx, prx) = channel();
+        let s = Sekme {
+            rx: arx,
+            tx: ptx,
+            anlik: None,
+            saat: Default::default(),
+            saat_hatasi: [false; 2],
+            menu: None,
+        };
+        (s, atx, prx)
+    }
+
+    fn anlik(p: &Politika, zaman: i64) -> Anlik {
+        Anlik {
+            okuma: Okuma::Gecerli(p.clone()),
+            nazar: Some(ArkaplanDurumu {
+                zaman,
+                ..Default::default()
+            }),
+            yazma_hatasi: None,
+            bugun: 0,
+        }
+    }
+
+    /// Sekmeyi bir kare çizer.
+    fn ciz(ctx: &egui::Context, s: &mut Sekme) {
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let p = theme::current(ui.ctx());
+            s.ui(ui, p);
+        });
+        out.textures_delta.clear(); // çizici yok
+    }
+
+    #[test]
+    fn yazilan_saat_nazar_durumuyla_silinmez() {
+        // nazard durum dosyasını ~10 sn'de bir yazar; her yeni anlık saat kutularını dosyadaki
+        // değerle yeniden dolduruyor, kullanıcının yazmakta olduğu "06:3"ü siliyordu.
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let (mut s, atx, _prx) = isciz();
+        let mut p = Politika::default();
+        p.ocr.saatler = "00:00-06:30".into();
+        atx.send(anlik(&p, 1)).unwrap();
+        ciz(&ctx, &mut s);
+        assert_eq!(s.saat[1].1, "06:30");
+        s.saat[1].1 = "06:3".into();
+        atx.send(anlik(&p, 2)).unwrap(); // yalnız Nazar durumu değişti
+        ciz(&ctx, &mut s);
+        assert_eq!(s.saat[1].1, "06:3", "yazılan saat silindi");
+    }
+
+    #[test]
+    fn aralik_disi_sinir_sekme_acilinca_yazilmaz() {
+        // Elle "cpu_yuzde = 100" (sınır yok) yazılmışsa DragValue onu 95'e kırpıp değişti
+        // sayıyor, sekme açılır açılmaz dosya sessizce yeniden yazılıyordu.
+        let ctx = egui::Context::default();
+        theme::apply(&ctx);
+        let (mut s, atx, prx) = isciz();
+        let mut p = Politika::default();
+        p.sinirlar.cpu_yuzde = 100;
+        p.sinirlar.bellek_yuzde = 100;
+        atx.send(anlik(&p, 1)).unwrap();
+        for _ in 0..3 {
+            ciz(&ctx, &mut s);
+        }
+        assert!(prx.try_recv().is_err(), "dokunulmadan yazma istendi");
+    }
 
     #[test]
     fn saat_araligi_tek_parca_sarilir() {
