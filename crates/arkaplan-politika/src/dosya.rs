@@ -147,6 +147,10 @@ pub struct ArkaplanDurumu {
     pub ocr_kuyrugu: usize,
     pub gomme: IsDurumu,
     pub ocr: IsDurumu,
+    /// Görüntü gömme (Qwen3-VL, ayrı süreç `nazard-gorsel`). Ayrı saat/duraklatma
+    /// ister; `IsTuru::Gorsel`. Eski yazıcı bu alanı yazmazsa `Default` okunur.
+    #[serde(default)]
+    pub gorsel: IsDurumu,
 }
 
 pub fn durum_yaz(yol: &Path, d: &ArkaplanDurumu) -> io::Result<()> {
@@ -294,8 +298,25 @@ mod tests {
                 neden: Some("saat dışı".into()),
                 bugun: 0,
             },
+            gorsel: IsDurumu {
+                calisiyor: true,
+                neden: None,
+                bugun: 2,
+            },
         };
         durum_yaz(&yol, &d).unwrap();
         assert_eq!(durum_oku(&yol), Some(d));
+    }
+
+    /// Eski yazıcı `gorsel` alanını yazmıyordu; okuyucu onu `Default` ile doldurmalı
+    /// (alan eklenince eski durum dosyası okunamaz hâle gelmemeli).
+    #[test]
+    fn eski_durum_dosyasi_gorselsiz_okunur() {
+        let metin = r#"{"zaman":5,"parca_vektoru":[1,2],"ocr_kuyrugu":3,
+            "gomme":{"calisiyor":true,"neden":null,"bugun":7},
+            "ocr":{"calisiyor":false,"neden":null,"bugun":0}}"#;
+        let d: ArkaplanDurumu = serde_json::from_str(metin).expect("eski dosya okunmalı");
+        assert_eq!(d.gorsel, IsDurumu::default());
+        assert_eq!(d.gomme.bugun, 7);
     }
 }

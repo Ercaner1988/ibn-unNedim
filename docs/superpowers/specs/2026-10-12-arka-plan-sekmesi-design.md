@@ -103,7 +103,10 @@ tesseract). Sınır böylece yalnız kullanıcının çalıştırdığı program
 
 ### 2.2 Arka plan sekmesi
 
-**Satırlar:** "Toplu gömme" ve "OCR" satırlarının her biri şunları içerir:
+**Satırlar (29.10.2026: üç satır):** "Toplu gömme", "OCR" ve "Görüntü gömme" satırlarının
+her biri şunları içerir. Görüntü gömme satırı ayrı süreçtedir (`nazard-gorsel`,
+Qwen3-VL 2048); taşıdığı üç sayı yerine bugün gömülen görüntüyü ve durumu gösterir; saat
+ve duraklatması kendi politika bölümüdür (`[gorsel]`):
 
 - durum ve nedeni: renkli nokta + metin ("çalışıyor", "saat dışı", "duraklatıldı · bitiş 15:40");
   simge karakteri yok (gömülü yazı tipinde olmayabilir),

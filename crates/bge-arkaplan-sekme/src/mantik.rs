@@ -10,13 +10,13 @@ pub const BAYAT_SN: i64 = 60;
 /// "her zaman" kapatılınca önerilen aralık.
 pub const VARSAYILAN_ARALIK: SaatAraligi = SaatAraligi::Aralik { bas: 0, son: 390 };
 
-/// Sekmedeki saat satırı sırası; bu sekmede satırı olmayan iş türü (`Gorsel`, görüntü gömme)
-/// `None` — bge görüntü işi koşturmaz, Nazar'ın kendi arka plan sekmesi yoktur.
+/// Sekmedeki saat satırı sırası: toplu gömme, OCR (Nazar), görüntü gömme (Nazar,
+/// ayrı süreç `nazard-gorsel`; model ~8 GB tuttuğu için ayrı saat/duraklatma ister).
 pub fn sira(is: IsTuru) -> Option<usize> {
     match is {
         IsTuru::Gomme => Some(0),
         IsTuru::Ocr => Some(1),
-        IsTuru::Gorsel => None,
+        IsTuru::Gorsel => Some(2),
     }
 }
 
@@ -125,6 +125,27 @@ pub fn ocr_durumu(
     }
 }
 
+/// Görüntü gömme satırı (Nazar `nazard-gorsel`): ayrı saat/duraklatma, ayrı model.
+/// Nazar durumu bayatsa "nazard yanıt vermiyor" — görüntü işini de o yazar.
+pub fn gorsel_durumu(
+    p: &Politika,
+    simdi: i64,
+    gun_sn: Option<u32>,
+    nazar: Option<&ArkaplanDurumu>,
+) -> SatirDurumu {
+    if let Some(d) = duraklatma_satiri(p, IsTuru::Gorsel, simdi, gun_sn) {
+        return d;
+    }
+    let Some(d) = nazar.filter(|d| simdi - d.zaman <= BAYAT_SN) else {
+        return satir(Tur::Hata, "nazard yanıt vermiyor");
+    };
+    match &d.gorsel.neden {
+        Some(n) => satir(Tur::Bekliyor, n.clone()),
+        None if d.gorsel.calisiyor => satir(Tur::Calisiyor, "çalışıyor"),
+        None => satir(Tur::Bosta, "boşta"),
+    }
+}
+
 /// Bugün gömülen: sayaç gün değişince o anki değerden yeniden sayılır.
 pub fn bugun_farki(taban: &mut (Option<u32>, u64), tarih: Option<u32>, toplam: u64) -> u64 {
     if taban.0 != tarih {
@@ -224,6 +245,47 @@ mod tests {
         assert_eq!(bugun_farki(&mut taban, Some(20261013), 40), 40);
         assert_eq!(bugun_farki(&mut taban, Some(20261014), 55), 0, "yeni gün");
         assert_eq!(bugun_farki(&mut taban, Some(20261014), 60), 5);
+    }
+
+    #[test]
+    fn sira_gorsel_satirini_kapsar() {
+        assert_eq!(sira(IsTuru::Gomme), Some(0));
+        assert_eq!(sira(IsTuru::Ocr), Some(1));
+        assert_eq!(sira(IsTuru::Gorsel), Some(2));
+    }
+
+    #[test]
+    fn gorsel_satiri() {
+        let p = Politika::default();
+        assert_eq!(
+            gorsel_durumu(&p, 10, None, None).metin,
+            "nazard yanıt vermiyor"
+        );
+        let d = ArkaplanDurumu {
+            zaman: 0,
+            ..Default::default()
+        };
+        assert_eq!(gorsel_durumu(&p, 10, None, Some(&d)).tur, Tur::Bosta);
+        let calisan = ArkaplanDurumu {
+            zaman: 0,
+            gorsel: IsDurumu {
+                calisiyor: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        assert_eq!(
+            gorsel_durumu(&p, 10, None, Some(&calisan)).tur,
+            Tur::Calisiyor
+        );
+        // Politika görüntü işini durdurduysa Nazar "boşta" dese de satır duraklatmayı gösterir.
+        let mut q = p.clone();
+        q.gorsel.duraklat_bitis = SURDURENE_DEK;
+        let d = gorsel_durumu(&q, 10, None, Some(&calisan));
+        assert_eq!(
+            (d.tur, d.metin.as_str()),
+            (Tur::Duraklatildi, "duraklatıldı · sürdürene dek")
+        );
     }
 
     #[test]

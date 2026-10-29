@@ -18,7 +18,7 @@ saatler = "22:00-06:30"
 duraklat_bitis = 0
 "#;
 
-const DURUM: &str = r#"{"zaman":1,"parca_vektoru":[2,3],"ocr_kuyrugu":4,"gomme":{"calisiyor":true,"neden":null,"bugun":5},"ocr":{"calisiyor":false,"neden":"saat dışı","bugun":6}}"#;
+const DURUM: &str = r#"{"zaman":1,"parca_vektoru":[2,3],"ocr_kuyrugu":4,"gomme":{"calisiyor":true,"neden":null,"bugun":5},"ocr":{"calisiyor":false,"neden":"saat dışı","bugun":6},"gorsel":{"calisiyor":true,"neden":null,"bugun":2}}"#;
 
 #[test]
 fn ornek_politika_okunur() {
@@ -49,4 +49,19 @@ fn durum_json_alanlari() {
     assert_eq!((d.zaman, d.parca_vektoru, d.ocr_kuyrugu), (1, (2, 3), 4));
     assert_eq!(d.ocr.neden.as_deref(), Some("saat dışı"));
     assert_eq!((d.gomme.bugun, d.ocr.bugun), (5, 6));
+    assert!(d.gorsel.calisiyor, "görüntü işi çalışıyor görünmeli");
+    assert_eq!(d.gorsel.bugun, 2);
+}
+
+#[test]
+fn eski_durum_json_gorselsiz_okunur() {
+    // 29.10.2026 öncesi yazılmış durum dosyasında `gorsel` yok: `Default` ile açılır.
+    let eski = DURUM.replace(
+        ",\"gorsel\":{\"calisiyor\":true,\"neden\":null,\"bugun\":2}",
+        "",
+    );
+    assert!(!eski.contains("gorsel"));
+    let d: ArkaplanDurumu = serde_json::from_str(&eski).unwrap();
+    assert_eq!(d.gorsel, arkaplan_politika::IsDurumu::default());
+    assert_eq!(d.gomme.bugun, 5);
 }

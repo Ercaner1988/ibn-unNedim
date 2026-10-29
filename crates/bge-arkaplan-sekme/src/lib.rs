@@ -33,9 +33,9 @@ pub struct Sekme {
     rx: Receiver<Anlik>,
     tx: Sender<Politika>,
     anlik: Option<Anlik>,
-    /// Saat kutuları [gömme, ocr] × (baş, son); işçiden yeni anlık gelince doldurulur.
-    saat: [(String, String); 2],
-    saat_hatasi: [bool; 2],
+    /// Saat kutuları [gömme, OCR, görüntü] × (baş, son); işçiden yeni anlık gelince doldurulur.
+    saat: [(String, String); 3],
+    saat_hatasi: [bool; 3],
     menu: Option<IsTuru>,
 }
 
@@ -94,7 +94,7 @@ impl Sekme {
             tx: ptx,
             anlik: None,
             saat: Default::default(),
-            saat_hatasi: [false; 2],
+            saat_hatasi: [false; 3],
             menu: None,
         }
     }
@@ -123,7 +123,7 @@ impl Sekme {
 
     fn saatleri_doldur(&mut self) {
         let p = self.politika();
-        for is in [IsTuru::Gomme, IsTuru::Ocr] {
+        for is in [IsTuru::Gomme, IsTuru::Ocr, IsTuru::Gorsel] {
             let a = match SaatAraligi::ayristir(&p.is(is).saatler) {
                 Ok(SaatAraligi::Aralik { bas, son }) => (bas, son),
                 _ => match VARSAYILAN_ARALIK {
@@ -160,6 +160,8 @@ impl Sekme {
         self.render_gomme(ui, p, simdi, gun_sn);
         ui.add_space(theme::GAP_MD);
         self.render_ocr(ui, p, simdi, gun_sn);
+        ui.add_space(theme::GAP_MD);
+        self.render_gorsel(ui, p, simdi, gun_sn);
         ui.add_space(theme::GAP_MD);
         self.render_sinirlar(ui, p);
     }
@@ -240,6 +242,26 @@ impl Sekme {
             p,
             IsTuru::Ocr,
             "OCR (Nazar)",
+            &pol,
+            durum,
+            sayilar,
+            (simdi, gun_sn),
+        );
+    }
+
+    fn render_gorsel(&mut self, ui: &mut Ui, p: Palette, simdi: i64, gun_sn: Option<u32>) {
+        let pol = self.politika();
+        let nazar = self.taze_nazar(simdi);
+        let durum = gorsel_durumu(&pol, simdi, gun_sn, nazar.as_ref());
+        let sayilar = match &nazar {
+            Some(d) => format!("bugün {} görüntü · Qwen3-VL 2048", d.gorsel.bugun),
+            None => "nazard'dan durum gelmiyor".into(),
+        };
+        self.render_is(
+            ui,
+            p,
+            IsTuru::Gorsel,
+            "Görüntü gömme (Nazar)",
             &pol,
             durum,
             sayilar,
@@ -477,7 +499,7 @@ mod tests {
             tx: ptx,
             anlik: None,
             saat: Default::default(),
-            saat_hatasi: [false; 2],
+            saat_hatasi: [false; 3],
             menu: None,
         };
         (s, atx, prx)
