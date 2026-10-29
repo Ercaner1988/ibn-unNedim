@@ -10,10 +10,13 @@ pub const BAYAT_SN: i64 = 60;
 /// "her zaman" kapatılınca önerilen aralık.
 pub const VARSAYILAN_ARALIK: SaatAraligi = SaatAraligi::Aralik { bas: 0, son: 390 };
 
-pub fn sira(is: IsTuru) -> usize {
+/// Sekmedeki saat satırı sırası; bu sekmede satırı olmayan iş türü (`Gorsel`, görüntü gömme)
+/// `None` — bge görüntü işi koşturmaz, Nazar'ın kendi arka plan sekmesi yoktur.
+pub fn sira(is: IsTuru) -> Option<usize> {
     match is {
-        IsTuru::Gomme => 0,
-        IsTuru::Ocr => 1,
+        IsTuru::Gomme => Some(0),
+        IsTuru::Ocr => Some(1),
+        IsTuru::Gorsel => None,
     }
 }
 

@@ -8,6 +8,9 @@ use std::fmt;
 pub enum IsTuru {
     Gomme,
     Ocr,
+    /// Görüntü gömme (Nazar `nazar-gorsel`): Qwen3-VL modeli tek başına ~8 GB tutar,
+    /// bu yüzden toplu gömmeden ayrı saat/duraklatma ister. bge bu işi koşturmaz.
+    Gorsel,
 }
 
 /// Gün içi dakikalarla saat aralığı; `bas > son` gece yarısını aşar.
@@ -389,6 +392,33 @@ mod tests {
     }
 
     #[test]
+    fn gorsel_isi_ayri_saat_ve_duraklatma() {
+        // Görüntü gömme modeli ~8 GB: toplu gömme duraklatılınca o da dursaydı gece çalıştırmak
+        // imkânsız olurdu. Üç iş türü saat ve duraklatma bakımından birbirinden bağımsızdır.
+        let mut p = Politika::default();
+        p.gomme.duraklat_bitis = 2_000;
+        assert_eq!(
+            karar(&p, IsTuru::Gorsel, &olcum(), false),
+            Ok(()),
+            "toplu gömme duraklatması görüntü işini kesmez"
+        );
+        p.gorsel.saatler = "00:00-06:30".into();
+        assert_eq!(
+            karar(&p, IsTuru::Gorsel, &olcum(), false),
+            Err(Neden::SaatDisi)
+        );
+        assert_eq!(
+            karar(&p, IsTuru::Gomme, &olcum(), false),
+            Err(Neden::Duraklatildi { bitis: 2_000 })
+        );
+        assert_eq!(
+            karar(&p, IsTuru::Ocr, &olcum(), false),
+            Ok(()),
+            "OCR etkilenmez"
+        );
+    }
+
+    #[test]
     fn bellek_esikli() {
         assert!(bellek_dar_mi(90, 90, false));
         assert!(!bellek_dar_mi(90, 87, false));
@@ -425,6 +455,7 @@ mod tests {
         let mut p = Politika::default();
         p.ocr.duraklat_bitis = SURDURENE_DEK;
         p.gomme.saatler = "22:00-06:30".into();
+        p.gorsel.saatler = "00:00-06:30".into();
         let q = Politika::ayristir(&p.metin()).unwrap();
         assert_eq!(q, p);
     }

@@ -27,6 +27,9 @@ pub struct Politika {
     pub gomme: IsAyari,
     #[serde(default)]
     pub ocr: IsAyari,
+    /// Görüntü gömme (Qwen3-VL, ~8 GB): ayrı saat ve duraklatma.
+    #[serde(default)]
+    pub gorsel: IsAyari,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -71,6 +74,7 @@ impl Default for Politika {
             sinirlar: Sinirlar::default(),
             gomme: IsAyari::default(),
             ocr: IsAyari::default(),
+            gorsel: IsAyari::default(),
         }
     }
 }
@@ -80,6 +84,7 @@ impl Politika {
         match t {
             IsTuru::Gomme => &self.gomme,
             IsTuru::Ocr => &self.ocr,
+            IsTuru::Gorsel => &self.gorsel,
         }
     }
 
@@ -87,6 +92,7 @@ impl Politika {
         match t {
             IsTuru::Gomme => &mut self.gomme,
             IsTuru::Ocr => &mut self.ocr,
+            IsTuru::Gorsel => &mut self.gorsel,
         }
     }
 
@@ -96,7 +102,7 @@ impl Politika {
         if p.surum != SURUM {
             return Err(format!("bilinmeyen surum {} (beklenen {SURUM})", p.surum));
         }
-        for (ad, is) in [("gomme", &p.gomme), ("ocr", &p.ocr)] {
+        for (ad, is) in [("gomme", &p.gomme), ("ocr", &p.ocr), ("gorsel", &p.gorsel)] {
             SaatAraligi::ayristir(&is.saatler).map_err(|e| format!("[{ad}] saatler: {e}"))?;
         }
         let s = &p.sinirlar;

@@ -13,6 +13,9 @@ duraklat_bitis = 0
 [ocr]
 saatler = "00:00-06:30"
 duraklat_bitis = 0
+[gorsel]
+saatler = "22:00-06:30"
+duraklat_bitis = 0
 "#;
 
 const DURUM: &str = r#"{"zaman":1,"parca_vektoru":[2,3],"ocr_kuyrugu":4,"gomme":{"calisiyor":true,"neden":null,"bugun":5},"ocr":{"calisiyor":false,"neden":"saat dışı","bugun":6}}"#;
@@ -24,6 +27,20 @@ fn ornek_politika_okunur() {
     assert!(p.sinirlar.kullanirken_dur);
     assert_eq!(p.ocr.saatler, "00:00-06:30");
     assert_eq!(p.gomme.saatler, "her zaman");
+    assert_eq!(p.gorsel.saatler, "22:00-06:30", "görüntü gömme ayrı saat");
+}
+
+#[test]
+fn gorsel_bolumu_olmayan_eski_dosya_okunur() {
+    // 29.10.2026 öncesi yazılmış `arkaplan.toml`da `[gorsel]` yok: varsayılanla açılır.
+    let eski = ORNEK.replace(
+        "[gorsel]\nsaatler = \"22:00-06:30\"\nduraklat_bitis = 0\n",
+        "",
+    );
+    assert!(!eski.contains("[gorsel]"));
+    let p = Politika::ayristir(&eski).unwrap();
+    assert_eq!(p.gorsel.saatler, arkaplan_politika::HER_ZAMAN);
+    assert_eq!(p.gorsel.duraklat_bitis, 0);
 }
 
 #[test]

@@ -132,7 +132,8 @@ impl Sekme {
                 },
             };
             let m = |d: u32| format!("{:02}:{:02}", d / 60, d % 60);
-            self.saat[sira(is)] = (m(a.0), m(a.1));
+            let Some(i) = sira(is) else { continue };
+            self.saat[i] = (m(a.0), m(a.1));
         }
     }
 
@@ -292,7 +293,7 @@ impl Sekme {
     }
 
     fn render_saat(&mut self, ui: &mut Ui, p: Palette, is: IsTuru, pol: &Politika) {
-        let i = sira(is);
+        let Some(i) = sira(is) else { return };
         let mut her_zaman = matches!(
             SaatAraligi::ayristir(&pol.is(is).saatler),
             Ok(SaatAraligi::HerZaman) | Err(_)
